@@ -23,9 +23,11 @@ from asset_forge.common.types import (
     Phase,
     Receipt,
 )
+from asset_forge.lod import lod_pack
 from asset_forge.manifest import Target, build_manifests
 from asset_forge.mcp_client.backends import BackendRegistry, generate_with_fallback
 from asset_forge.mcp_client.session import McpSession
+from asset_forge.previews import preview_pack
 from asset_forge.retopo import retopo_pack
 from asset_forge.snap_grid import normalize_pack
 from asset_forge.uvunwrap import unwrap_pack
@@ -459,16 +461,139 @@ async def _phase_manifest(
     return f"{len(result.bundles)}/{len(requested)} bundles built"
 
 
+async def _phase_lod(
+    brief: Brief,
+    paths: PackPaths,
+    registry: BackendRegistry,
+    state: PackState,
+) -> str:
+    """Generate LOD chains via flax-meshopt-bridge."""
+    upstream = (
+        state.phases.get(Phase.SNAP_GRID)
+        or state.phases.get(Phase.UVUNWRAP)
+        or state.phases.get(Phase.RETOPO)
+    )
+    succeeded = list(upstream.pieces_completed) if upstream else []
+    if not succeeded:
+        return "skipped (no upstream outputs)"
+
+    results = await lod_pack(
+        paths,
+        brief,
+        pieces_succeeded=succeeded,
+        session=registry.session,
+    )
+    ok = [pid for pid, r in results.items() if r.success]
+    bad = [pid for pid, r in results.items() if not r.success]
+    ps = state.phase_state(Phase.LOD)
+    ps.pieces_completed = ok
+    ps.pieces_failed = bad
+
+    for pid, r in results.items():
+        _write_receipt(
+            paths.receipts_file,
+            pack_id=brief.id,
+            phase=Phase.LOD,
+            piece_id=pid,
+            tool="meshopt/lod_chain",
+            intent=f"lod chain piece {pid}",
+            outcome=Outcome.SUCCESS if r.success else Outcome.FAILED,
+            error_code=r.error_code,
+            error_message=r.error_message,
+            metadata={
+                "duration_s": r.duration_seconds,
+                "levels": r.levels_produced,
+                "face_counts": list(r.face_counts),
+                "size_bytes": r.size_bytes,
+            },
+        )
+
+    if not ok:
+        raise PhaseFailed(Phase.LOD.value, f"all {len(results)} pieces failed LOD")
+    return f"{len(ok)}/{len(results)} LOD chains built"
+
+
+async def _phase_previews(
+    brief: Brief,
+    paths: PackPaths,
+    registry: BackendRegistry,
+    state: PackState,
+) -> str:
+    """Render thumbnails + hero shots + pack cover."""
+    upstream = (
+        state.phases.get(Phase.LOD)
+        or state.phases.get(Phase.SNAP_GRID)
+        or state.phases.get(Phase.UVUNWRAP)
+        or state.phases.get(Phase.RETOPO)
+    )
+    succeeded = list(upstream.pieces_completed) if upstream else []
+    if not succeeded:
+        return "skipped (no upstream outputs)"
+
+    results = await preview_pack(
+        paths,
+        brief,
+        pieces_succeeded=succeeded,
+        session=registry.session,
+    )
+    ok = [pid for pid, r in results.items() if r.success and pid != "__cover__"]
+    bad = [pid for pid, r in results.items() if not r.success and pid != "__cover__"]
+    ps = state.phase_state(Phase.PREVIEWS)
+    ps.pieces_completed = ok
+    ps.pieces_failed = bad
+
+    for pid, r in results.items():
+        if pid == "__cover__":
+            _write_receipt(
+                paths.receipts_file,
+                pack_id=brief.id,
+                phase=Phase.PREVIEWS,
+                tool="blender_bridge/render_cover",
+                intent="render pack cover",
+                outcome=Outcome.SUCCESS if r.success else Outcome.FAILED,
+                error_code=r.error_code,
+                error_message=r.error_message,
+                metadata={
+                    "duration_s": r.duration_seconds,
+                    "cover_path": str(r.hero_image) if r.hero_image else None,
+                },
+            )
+            continue
+
+        _write_receipt(
+            paths.receipts_file,
+            pack_id=brief.id,
+            phase=Phase.PREVIEWS,
+            piece_id=pid,
+            tool="blender_bridge/render_piece",
+            intent=f"render previews for {pid}",
+            outcome=Outcome.SUCCESS if r.success else Outcome.FAILED,
+            error_code=r.error_code,
+            error_message=r.error_message,
+            metadata={
+                "duration_s": r.duration_seconds,
+                "hero": str(r.hero_image) if r.hero_image else None,
+                "thumb_count": len(r.thumbnail_images),
+            },
+        )
+
+    if not ok:
+        raise PhaseFailed(Phase.PREVIEWS.value, f"all {len(results) - 1} preview pieces failed")
+    cover_result = results.get("__cover__")
+    cover_note = " + cover" if cover_result is not None and cover_result.success else ""
+    return f"{len(ok)}/{len(results) - 1} previews rendered{cover_note}"
+
+
 _PHASE_HANDLERS: dict[Phase, PhaseHandler] = {
     Phase.GENERATION: _phase_generation,
     Phase.RETOPO: _phase_retopo,
     Phase.UVUNWRAP: _phase_uvunwrap,
     Phase.MATERIALS: _stub_for("materials"),
     Phase.STYLE_REVIEW: _stub_for("style_review"),
-    Phase.LOD: _stub_for("lod"),
+    Phase.LOD: _phase_lod,
     Phase.SNAP_GRID: _phase_snap_grid,
     Phase.EXPORT: _stub_for("export"),
-    Phase.PREVIEWS: _stub_for("previews"),
+    Phase.PREVIEWS: _phase_previews,
     Phase.MANIFEST: _phase_manifest,
     Phase.SHOWROOM: _stub_for("showroom"),
 }
