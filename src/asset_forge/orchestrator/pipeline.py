@@ -23,6 +23,7 @@ from asset_forge.common.types import (
     Phase,
     Receipt,
 )
+from asset_forge.export import EngineTarget, export_pack
 from asset_forge.lod import lod_pack
 from asset_forge.manifest import Target, build_manifests
 from asset_forge.mcp_client.backends import BackendRegistry, generate_with_fallback
@@ -584,6 +585,74 @@ async def _phase_previews(
     return f"{len(ok)}/{len(results) - 1} previews rendered{cover_note}"
 
 
+async def _phase_export(
+    brief: Brief,
+    paths: PackPaths,
+    registry: BackendRegistry,
+    state: PackState,
+) -> str:
+    """Build per-engine bundles (Unity / Unreal / Godot / master GLB)."""
+    del registry  # export is pure-IO; doesn't need MCP
+
+    upstream = (
+        state.phases.get(Phase.LOD)
+        or state.phases.get(Phase.SNAP_GRID)
+        or state.phases.get(Phase.UVUNWRAP)
+        or state.phases.get(Phase.RETOPO)
+        or state.phases.get(Phase.GENERATION)
+    )
+    succeeded = list(upstream.pieces_completed) if upstream else []
+    if not succeeded:
+        return "skipped (no upstream outputs)"
+
+    requested = tuple(
+        EngineTarget(t)
+        for t in brief.exports
+        if t in {e.value for e in EngineTarget}
+    )
+    if not requested:
+        return "skipped (no supported engine targets in brief)"
+
+    result = await export_pack(
+        paths, brief, pieces_succeeded=succeeded, targets=requested
+    )
+
+    for pkg in result.packages:
+        _write_receipt(
+            paths.receipts_file,
+            pack_id=brief.id,
+            phase=Phase.EXPORT,
+            tool=f"export:{pkg.target.value}",
+            intent=f"build {pkg.target.value} engine bundle",
+            outcome=Outcome.SUCCESS,
+            metadata={
+                "archive_path": str(pkg.archive_path),
+                "file_count": pkg.file_count,
+                "size_bytes": pkg.size_bytes,
+                "duration_s": pkg.duration_seconds,
+            },
+        )
+
+    for target, msg in result.failures:
+        _write_receipt(
+            paths.receipts_file,
+            pack_id=brief.id,
+            phase=Phase.EXPORT,
+            tool=f"export:{target.value}",
+            intent=f"build {target.value} engine bundle",
+            outcome=Outcome.FAILED,
+            error_code="export_failed",
+            error_message=msg,
+        )
+
+    if not result.packages:
+        raise PhaseFailed(
+            Phase.EXPORT.value,
+            f"all {len(requested)} engine exports failed",
+        )
+    return f"{len(result.packages)}/{len(requested)} engine bundles built"
+
+
 _PHASE_HANDLERS: dict[Phase, PhaseHandler] = {
     Phase.GENERATION: _phase_generation,
     Phase.RETOPO: _phase_retopo,
@@ -592,7 +661,7 @@ _PHASE_HANDLERS: dict[Phase, PhaseHandler] = {
     Phase.STYLE_REVIEW: _stub_for("style_review"),
     Phase.LOD: _phase_lod,
     Phase.SNAP_GRID: _phase_snap_grid,
-    Phase.EXPORT: _stub_for("export"),
+    Phase.EXPORT: _phase_export,
     Phase.PREVIEWS: _phase_previews,
     Phase.MANIFEST: _phase_manifest,
     Phase.SHOWROOM: _stub_for("showroom"),
