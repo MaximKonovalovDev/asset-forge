@@ -89,19 +89,30 @@ pieces:
   - { id: "mushroom_red",  category: "nature",     prompt: "stylized red-cap mushroom" }
 
 # --- Generation routing ---
-# Per docs/HARDWARE_REALITY.md: TripoSR primary (lightest VRAM,
-# MIT, commercial-OK), TRELLIS-HF secondary (runs on HF's GPU not
-# ours), Hunyuan3D-mini tertiary (needs --low-vram on 6 GB).
-# SF3D dropped: CC-BY-NC, cannot sell pack output.
-# AniGen dropped: needs 12+ GB VRAM.
+# Per docs/CLOUD_GPU_OPTIONS.md + docs/HARDWARE_REALITY.md.
+# Cloud-first via fal.ai (TRELLIS at $0.02/gen). For Pack #1 (30
+# pieces) the entire cost is ~$2 in cloud, $0 if using free signup
+# credit. Local routes are kept as offline-iteration fallback.
+# SF3D dropped: CC-BY-NC. AniGen deferred: needs 12+ GB VRAM.
 generation:
-  primary_routes: ["triposr", "trellis-hf"]
-  fallback_routes: ["hunyuan-mini", "rodin-trial"]
+  primary_routes: ["fal-trellis", "fal-triposr"]
+  hero_routes: ["fal-hunyuan3d-21"]   # for the 4 hero pieces
+  fallback_routes: ["triposr-local", "trellis-hf", "hunyuan-mini-local"]
   max_retries_per_piece: 3
+  estimated_cloud_cost_usd: 2.12  # 24 TRELLIS + 4 Hunyuan + 2 TripoSR
   pre_prompt_style_prefix: |
     Low-poly stylized fantasy prop, faceted shading,
     vibrant warm palette, Synty-inspired, clean topology,
     centered on origin, base resting on Y=0 plane.
+
+# --- Hero pieces (get the premium model) ---
+# The 4 pieces most likely to appear in marketing renders. Worth
+# the extra cost on Hunyuan3D Pro for showroom hero shots.
+hero_piece_ids:
+  - "chest_iron"      # featured on cover image
+  - "sword_short"     # weapons category lead
+  - "lantern_oil"     # lighting category lead
+  - "anvil_iron"      # blacksmith scene lead
 
 # --- Targets ---
 exports:

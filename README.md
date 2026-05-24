@@ -43,5 +43,11 @@ flax-mcp UNCHANGED.**
 
 ## Status
 
-Day 0 scaffold. See `docs/PLAN.md` for the 12-month roadmap and
-`docs/MARKET.md` for what the research found.
+Day 0 scaffold. See:
+- `docs/PLAN.md` — 12-month roadmap, $100k budget, BUILD/BUY/STEAL split
+- `docs/MARKET.md` — research from 15 strikes (Fab 88% cut, production gap, competitive landscape)
+- `docs/STEAL_INVENTORY.md` — every stealable thing catalogued + license risk
+- `docs/COMPETITIVE_MOAT.md` — 8 wins, 4 honest losses, 5 moat-decay risks
+- `docs/HARDWARE_REALITY.md` — 6 GB VRAM compatibility per tool
+- `docs/CLOUD_GPU_OPTIONS.md` — fal.ai / Kaggle / Colab pricing,
+  Pack #1 ships for **~$2 cloud cost** ($0 with free credits)

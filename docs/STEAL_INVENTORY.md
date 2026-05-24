@@ -58,11 +58,22 @@ re-implemented by us using only public ideas (not their code).**
 - **Decision**: we **DO NOT integrate LL3M.** Re-implement BlenderRAG
   ourselves from public Blender ScriptReference (free, MIT-friendly,
   no upstream dependency on a dead server).
-- **Alternative live patterns** (MIT, active 2026):
+- **Alternative live patterns** (MIT, active 2026, validated 2026-05-24):
   - **JustThreed** (Phanikondru/justthreed) — Blender + MCP + works
-    with Claude/Cursor/Ollama. MIT. Reference pattern.
+    with Claude/Cursor/Ollama. MIT.
+    - **What to copy**: multi-LLM-client design, two-way scene
+      awareness pattern, `.blend` save/resume across chats
+    - **What NOT to copy**: their Blender addon itself
+      (we use flax-blender-bridge, already vendoring ahujasid)
   - **saofund/LLM-Blender-Agent** — Blender + Function-Calling LLMs
-    (Claude/DeepSeek/Zhipu/Moonshot). MIT. Reference pattern.
+    (Claude/DeepSeek/Zhipu/Moonshot/Doubao/Kimi). MIT, 20 stars.
+    - **What to copy**: cheap-LLM-API abstraction layer; DeepSeek V3
+      costs ~10x less than Claude for Blender Python code-gen
+    - **Cost impact**: for asset-forge's per-piece LLM seam-hint
+      calls (UV unwrap), DeepSeek API or local Ollama Qwen Coder
+      cuts cost from ~$0.05/piece to ~$0.005/piece
+    - **Config shape**: their `config.json` LLM-switching shape is
+      clean; copy verbatim
 - **Risk**: zero, since we don't integrate the dead code at all.
 
 ### ProcFunc (Princeton) — function-oriented procedural Blender API
