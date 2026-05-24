@@ -364,6 +364,12 @@ class BackendRegistry:
         self._session = session
         self._cache: dict[str, Backend] = {}
 
+    @property
+    def session(self) -> McpSession:
+        """Expose the session for phase handlers that need it directly
+        (retopo / uvunwrap / snap_grid / manifest)."""
+        return self._session
+
     def get(self, route: str) -> Backend:
         if route in self._cache:
             return self._cache[route]

@@ -23,8 +23,12 @@ from asset_forge.common.types import (
     Phase,
     Receipt,
 )
+from asset_forge.manifest import Target, build_manifests
 from asset_forge.mcp_client.backends import BackendRegistry, generate_with_fallback
 from asset_forge.mcp_client.session import McpSession
+from asset_forge.retopo import retopo_pack
+from asset_forge.snap_grid import normalize_pack
+from asset_forge.uvunwrap import unwrap_pack
 
 from .brief import load_brief
 from .state import PackState, append_receipt, load_state, save_state
@@ -261,17 +265,211 @@ def _stub_for(name: str) -> PhaseHandler:
     return handler
 
 
+async def _phase_retopo(
+    brief: Brief,
+    paths: PackPaths,
+    registry: BackendRegistry,
+    state: PackState,
+) -> str:
+    """Run retopology over every successfully-generated piece."""
+    gen_state = state.phases.get(Phase.GENERATION)
+    succeeded = list(gen_state.pieces_completed) if gen_state else []
+    if not succeeded:
+        return "skipped (no generation outputs)"
+
+    results = await retopo_pack(
+        paths,
+        brief,
+        pieces_succeeded=succeeded,
+        session=registry.session,
+    )
+    ok = [pid for pid, r in results.items() if r.success]
+    bad = [pid for pid, r in results.items() if not r.success]
+    rs = state.phase_state(Phase.RETOPO)
+    rs.pieces_completed = ok
+    rs.pieces_failed = bad
+
+    for pid, r in results.items():
+        _write_receipt(
+            paths.receipts_file,
+            pack_id=brief.id,
+            phase=Phase.RETOPO,
+            piece_id=pid,
+            tool=f"retopo:{r.backend}",
+            intent=f"retopo piece {pid}",
+            outcome=Outcome.SUCCESS if r.success else Outcome.FAILED,
+            error_code=r.error_code,
+            error_message=r.error_message,
+            metadata={
+                "duration_s": r.duration_seconds,
+                "out_faces": r.output_face_count,
+            },
+        )
+
+    if not ok:
+        raise PhaseFailed(Phase.RETOPO.value, f"all {len(results)} pieces failed retopo")
+    return f"{len(ok)}/{len(results)} retopo'd"
+
+
+async def _phase_uvunwrap(
+    brief: Brief,
+    paths: PackPaths,
+    registry: BackendRegistry,
+    state: PackState,
+) -> str:
+    """Unwrap UVs on every retopo'd piece."""
+    retopo_state = state.phases.get(Phase.RETOPO)
+    succeeded = list(retopo_state.pieces_completed) if retopo_state else []
+    if not succeeded:
+        return "skipped (no retopo outputs)"
+
+    results = await unwrap_pack(
+        paths,
+        brief,
+        pieces_succeeded=succeeded,
+        session=registry.session,
+    )
+    ok = [pid for pid, r in results.items() if r.success]
+    bad = [pid for pid, r in results.items() if not r.success]
+    ps = state.phase_state(Phase.UVUNWRAP)
+    ps.pieces_completed = ok
+    ps.pieces_failed = bad
+
+    for pid, r in results.items():
+        _write_receipt(
+            paths.receipts_file,
+            pack_id=brief.id,
+            phase=Phase.UVUNWRAP,
+            piece_id=pid,
+            tool=f"uv:{r.strategy.value}",
+            intent=f"uvunwrap piece {pid}",
+            outcome=Outcome.SUCCESS if r.success else Outcome.FAILED,
+            error_code=r.error_code,
+            error_message=r.error_message,
+            metadata={
+                "duration_s": r.duration_seconds,
+                "islands": r.uv_islands_count,
+                "atlas_waste_pct": r.atlas_waste_pct,
+            },
+        )
+
+    if not ok:
+        raise PhaseFailed(Phase.UVUNWRAP.value, f"all {len(results)} pieces failed uvunwrap")
+    return f"{len(ok)}/{len(results)} unwrapped"
+
+
+async def _phase_snap_grid(
+    brief: Brief,
+    paths: PackPaths,
+    registry: BackendRegistry,
+    state: PackState,
+) -> str:
+    """Pivot/scale/naming normalization. Reads from uv_dir (or materials_dir
+    if materials has run), writes to final_dir."""
+    upstream_state = (
+        state.phases.get(Phase.UVUNWRAP) or state.phases.get(Phase.RETOPO)
+    )
+    succeeded = list(upstream_state.pieces_completed) if upstream_state else []
+    if not succeeded:
+        return "skipped (no upstream outputs)"
+
+    results = await normalize_pack(
+        paths,
+        brief,
+        pieces_succeeded=succeeded,
+        session=registry.session,
+    )
+    ok = [pid for pid, r in results.items() if r.success]
+    bad = [pid for pid, r in results.items() if not r.success]
+    ps = state.phase_state(Phase.SNAP_GRID)
+    ps.pieces_completed = ok
+    ps.pieces_failed = bad
+
+    for pid, r in results.items():
+        _write_receipt(
+            paths.receipts_file,
+            pack_id=brief.id,
+            phase=Phase.SNAP_GRID,
+            piece_id=pid,
+            tool="snap_grid",
+            intent=f"normalize piece {pid}",
+            outcome=Outcome.SUCCESS if r.success else Outcome.FAILED,
+            error_code=r.error_code,
+            error_message=r.error_message,
+            metadata={
+                "canonical_name": r.canonical_name,
+                "duration_s": r.duration_seconds,
+            },
+        )
+
+    if not ok:
+        raise PhaseFailed(Phase.SNAP_GRID.value, f"all {len(results)} pieces failed snap_grid")
+    return f"{len(ok)}/{len(results)} normalized"
+
+
+async def _phase_manifest(
+    brief: Brief,
+    paths: PackPaths,
+    registry: BackendRegistry,
+    state: PackState,
+) -> str:
+    """Generate per-marketplace submission bundles."""
+    del registry, state  # manifest is pure-IO; doesn't need session or registry
+
+    requested = tuple(
+        Target(m) for m in brief.marketplaces if m in {t.value for t in Target}
+    )
+    if not requested:
+        return "skipped (no supported marketplaces in brief)"
+
+    result = await build_manifests(paths, brief, targets=requested)
+
+    for bundle in result.bundles:
+        _write_receipt(
+            paths.receipts_file,
+            pack_id=brief.id,
+            phase=Phase.MANIFEST,
+            tool=f"manifest:{bundle.target.value}",
+            intent=f"build manifest bundle for {bundle.target.value}",
+            outcome=Outcome.SUCCESS,
+            metadata={
+                "bundle_path": str(bundle.bundle_path),
+                "files": bundle.files_included,
+                "size_bytes": bundle.size_bytes,
+            },
+        )
+
+    for target, msg in result.failures:
+        _write_receipt(
+            paths.receipts_file,
+            pack_id=brief.id,
+            phase=Phase.MANIFEST,
+            tool=f"manifest:{target.value}",
+            intent=f"build manifest bundle for {target.value}",
+            outcome=Outcome.FAILED,
+            error_code="manifest_failed",
+            error_message=msg,
+        )
+
+    if not result.bundles:
+        raise PhaseFailed(
+            Phase.MANIFEST.value,
+            f"all {len(requested)} marketplace manifests failed",
+        )
+    return f"{len(result.bundles)}/{len(requested)} bundles built"
+
+
 _PHASE_HANDLERS: dict[Phase, PhaseHandler] = {
     Phase.GENERATION: _phase_generation,
-    Phase.RETOPO: _stub_for("retopo"),
-    Phase.UVUNWRAP: _stub_for("uvunwrap"),
+    Phase.RETOPO: _phase_retopo,
+    Phase.UVUNWRAP: _phase_uvunwrap,
     Phase.MATERIALS: _stub_for("materials"),
     Phase.STYLE_REVIEW: _stub_for("style_review"),
     Phase.LOD: _stub_for("lod"),
-    Phase.SNAP_GRID: _stub_for("snap_grid"),
+    Phase.SNAP_GRID: _phase_snap_grid,
     Phase.EXPORT: _stub_for("export"),
     Phase.PREVIEWS: _stub_for("previews"),
-    Phase.MANIFEST: _stub_for("manifest"),
+    Phase.MANIFEST: _phase_manifest,
     Phase.SHOWROOM: _stub_for("showroom"),
 }
 
