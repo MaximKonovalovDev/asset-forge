@@ -1,0 +1,135 @@
+# Pack #1 — the calibration pack
+#
+# Purpose: ship ONE pack manually end-to-end to learn the real
+# pipeline shape. This pack is intentionally small (30 pieces) and
+# scoped to a well-understood genre so we can focus on the pipeline,
+# not the art direction.
+#
+# Pricing: $9.99 launch / $19.99 normal
+# Target marketplaces: Fab (primary), Itch.io, Gumroad. Unity Asset
+# Store after first acceptance elsewhere (their submission cycle is
+# slower).
+
+id: "001-fantasy-props"
+title: "Low-Poly Fantasy Props — Volume 1"
+description: |
+  30 hand-curated low-poly fantasy props for stylized RPGs and
+  adventure games. Modular, snap-grid-aligned, demo scenes for
+  Unity / Unreal / Godot.
+
+# --- Style spec (the heart of the brief) ---
+style:
+  reference_image: "reference/hero.png"
+  reference_description: "low-poly faceted shading, vibrant palette,
+    Synty-inspired stylization, warm fantasy mood"
+  generation_seed: 42
+  palette:
+    - "#a04040"   # wood-red
+    - "#80c0ff"   # sky-blue
+    - "#f0e090"   # parchment-cream
+    - "#604030"   # dark-wood
+    - "#306020"   # forest-green
+    - "#c0c0c0"   # iron-grey
+  polygon_count_band: [800, 2500]
+  texel_density_px_per_unit: 512
+  material_complexity: "low_poly_flat"
+  shading: "faceted"
+  uv_strategy: "smart_project"
+
+# --- Grid + snap spec ---
+grid:
+  preset: "synty_polygon"
+  grid_unit_meters: 1.0
+  snap_pivot_to: "base_center"
+  snap_rotation_to_axes: true
+  normalize_scale: true
+
+# --- The 30 pieces ---
+pieces:
+  # Containers (5)
+  - { id: "barrel_wooden", category: "container", prompt: "wooden barrel with iron rings, weathered" }
+  - { id: "crate_small",   category: "container", prompt: "small wooden crate, slats visible" }
+  - { id: "crate_large",   category: "container", prompt: "large wooden crate, reinforced corners" }
+  - { id: "sack_grain",    category: "container", prompt: "burlap grain sack, slumped" }
+  - { id: "chest_iron",    category: "container", prompt: "iron-bound treasure chest, closed" }
+
+  # Furniture (6)
+  - { id: "table_round",   category: "furniture", prompt: "round wooden tavern table" }
+  - { id: "table_long",    category: "furniture", prompt: "long wooden banquet table" }
+  - { id: "chair_wooden",  category: "furniture", prompt: "simple wooden chair" }
+  - { id: "stool_short",   category: "furniture", prompt: "three-legged short wooden stool" }
+  - { id: "bench_wooden",  category: "furniture", prompt: "wooden bench for two" }
+  - { id: "shelf_wall",    category: "furniture", prompt: "wall-mounted wooden shelf" }
+
+  # Containers/vessels (4)
+  - { id: "bucket_wood",   category: "vessel",    prompt: "wooden bucket with rope handle" }
+  - { id: "jug_clay",      category: "vessel",    prompt: "clay jug with handle, painted" }
+  - { id: "bottle_glass",  category: "vessel",    prompt: "stylized glass potion bottle" }
+  - { id: "pot_iron",      category: "vessel",    prompt: "cast iron cooking pot with handle" }
+
+  # Lighting (3)
+  - { id: "torch_wall",    category: "lighting",  prompt: "iron wall torch sconce, unlit" }
+  - { id: "lantern_oil",   category: "lighting",  prompt: "hanging oil lantern, brass" }
+  - { id: "candle_pillar", category: "lighting",  prompt: "thick pillar candle on iron stand" }
+
+  # Weapons/props (4)
+  - { id: "sword_short",   category: "weapon",    prompt: "short iron sword, leather grip" }
+  - { id: "axe_hand",      category: "weapon",    prompt: "single-handed wooden-handle axe" }
+  - { id: "shield_round",  category: "weapon",    prompt: "round wooden shield with iron rim" }
+  - { id: "bow_short",     category: "weapon",    prompt: "short wooden bow, string drawn" }
+
+  # Misc (8)
+  - { id: "anvil_iron",    category: "blacksmith", prompt: "blacksmith anvil on wooden block" }
+  - { id: "wheel_cart",    category: "transport",  prompt: "wooden cart wheel, spoked" }
+  - { id: "rope_coil",     category: "misc",       prompt: "coiled hemp rope" }
+  - { id: "book_closed",   category: "misc",       prompt: "thick leather-bound closed book" }
+  - { id: "scroll_rolled", category: "misc",       prompt: "rolled parchment scroll with ribbon" }
+  - { id: "log_split",     category: "nature",     prompt: "split firewood log" }
+  - { id: "rock_mossy",    category: "nature",     prompt: "mossy round boulder" }
+  - { id: "mushroom_red",  category: "nature",     prompt: "stylized red-cap mushroom" }
+
+# --- Generation routing ---
+generation:
+  primary_routes: ["trellis-hf", "hunyuan-mini"]
+  fallback_routes: ["sf3d", "triposr"]
+  max_retries_per_piece: 3
+  pre_prompt_style_prefix: |
+    Low-poly stylized fantasy prop, faceted shading,
+    vibrant warm palette, Synty-inspired, clean topology,
+    centered on origin, base resting on Y=0 plane.
+
+# --- Targets ---
+exports:
+  - unity
+  - unreal
+  - godot
+  - master_glb
+
+marketplaces:
+  - fab
+  - itchio
+  - gumroad
+  # Unity Asset Store deferred to Pack #2 (after first marketplace acceptance)
+
+# --- Demo scenes ---
+demo_scenes:
+  - { name: "tavern_corner",   description: "small tavern corner using tables, chairs, lantern, bottles" }
+  - { name: "blacksmith_yard", description: "blacksmith shop with anvil, axe, sword, shield, barrel" }
+  - { name: "campsite",        description: "outdoor campsite with logs, mushrooms, rocks, torch" }
+
+# --- Pricing ---
+pricing:
+  launch_usd: 9.99
+  normal_usd: 19.99
+  launch_window_days: 14
+
+# --- AI disclosure (auto-generated into manifest later) ---
+ai_disclosure:
+  models_used:
+    - "TRELLIS (HuggingFace Spaces)"
+    - "Hunyuan3D-mini (Blender vendored)"
+    - "Stable Fast 3D (Blender vendored, fallback)"
+  human_review: "All 30 pieces reviewed by operator. Topology and UVs
+    validated. Materials hand-tuned to palette. Demo scenes
+    hand-composed."
+  commercial_use_verified: true

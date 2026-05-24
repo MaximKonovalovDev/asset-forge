@@ -1,0 +1,47 @@
+# asset-forge
+
+**AI-driven game asset pack creation pipeline.** You direct, AI produces.
+Output: production-ready, marketplace-sellable, multi-engine asset packs.
+
+Born from: flax-mcp's existing 70-tool asset-pipeline surface
+(flax-asset-gen + flax-asset-worker + flax-blender-bridge +
+flax-meshopt-bridge + flax-procedural). asset-forge is the
+**operator-facing product** that turns that existing infrastructure
+into a sellable asset-pack factory.
+
+## Repo boundary (important)
+
+**asset-forge is a STANDALONE repo, not a flax-mcp plugin.**
+
+- Lives at `C:\Users\me\Desktop\asset-forge\` (this directory)
+- Does **not** modify `C:\flax\flax-mcp\` — flax-mcp is unchanged
+- Talks to flax-mcp as an **MCP client over :8765** (same way
+  Claude Code does)
+- Has its own MIT license, its own CI, its own release cadence
+- Can be open-sourced later without dragging flax-mcp along
+- Sold as a commercial product without exposing flax-mcp internals
+
+flax-mcp's 5 asset-related plugins (flax-asset-gen, flax-asset-worker,
+flax-blender-bridge, flax-meshopt-bridge, flax-procedural) **stay
+where they are**. They are the MCP-tool layer for AI agents working
+in Flax projects. asset-forge is one such agent — a specialized one
+focused on producing sellable packs end-to-end.
+
+If at month 6+ we find genuinely engine-agnostic MCP-tool patterns
+worth contributing back, those can graduate into flax-mcp as
+patches. But day-1 architecture is: **asset-forge OUTSIDE,
+flax-mcp UNCHANGED.**
+
+## Project commitment
+
+- **$100k Opus dev budget**, **1-year timeline**
+- Built **on top of** flax-mcp (as a client), not a rewrite
+- **Primary income path:** sell asset packs (Fab/Unity/Itch.io/Gumroad/own store)
+- **Secondary income path:** sell the asset-forge tooling itself
+  (open-core + hosted + premium tiers) — Synty-the-business shape,
+  not Synty-the-art shape
+
+## Status
+
+Day 0 scaffold. See `docs/PLAN.md` for the 12-month roadmap and
+`docs/MARKET.md` for what the research found.

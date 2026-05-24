@@ -1,0 +1,54 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+dist/
+build/
+*.egg-info/
+
+# Asset outputs (huge binary; never commit raw produced assets)
+out/
+output/
+generated/
+renders/
+*.blend
+*.blend1
+*.fbx
+*.glb
+*.gltf
+*.usdz
+*.obj
+*.usd
+*.usdc
+*.usda
+*.png.import
+*.jpg.import
+# DO commit briefs and small reference images per pack:
+!packs/**/brief.yaml
+!packs/**/reference/*.png
+!packs/**/reference/*.jpg
+!packs/**/README.md
+
+# Secrets
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Large local data
+data/
+cache/
+.cache/
+*.sqlite
+*.db
