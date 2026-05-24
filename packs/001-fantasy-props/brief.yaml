@@ -89,9 +89,14 @@ pieces:
   - { id: "mushroom_red",  category: "nature",     prompt: "stylized red-cap mushroom" }
 
 # --- Generation routing ---
+# Per docs/HARDWARE_REALITY.md: TripoSR primary (lightest VRAM,
+# MIT, commercial-OK), TRELLIS-HF secondary (runs on HF's GPU not
+# ours), Hunyuan3D-mini tertiary (needs --low-vram on 6 GB).
+# SF3D dropped: CC-BY-NC, cannot sell pack output.
+# AniGen dropped: needs 12+ GB VRAM.
 generation:
-  primary_routes: ["trellis-hf", "hunyuan-mini"]
-  fallback_routes: ["sf3d", "triposr"]
+  primary_routes: ["triposr", "trellis-hf"]
+  fallback_routes: ["hunyuan-mini", "rodin-trial"]
   max_retries_per_piece: 3
   pre_prompt_style_prefix: |
     Low-poly stylized fantasy prop, faceted shading,

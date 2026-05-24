@@ -10,11 +10,15 @@ re-implemented by us using only public ideas (not their code).**
 
 ## ALREADY OWNED (in flax-mcp, just consume via MCP)
 
-### flax-asset-gen — 5-route AI 3D generation
-- Routes: HF Spaces TRELLIS, Blender-Rodin-trial, Blender-Hunyuan-mini,
-  Blender-StableFast3D, Blender-TripoSR
-- License: each upstream model has its own; flax-asset-gen tracks
-  commercial-use rights
+### flax-asset-gen — AI 3D generation router (4 viable routes on 6 GB)
+- Routes verified usable: TripoSR (MIT, primary), TRELLIS via HF
+  Spaces (free, remote compute), Hunyuan3D-mini (with `--low-vram`),
+  Rodin trial (verify T&Cs per pack)
+- **Stable Fast 3D removed**: CC-BY-NC license, cannot be used in
+  sellable packs. flax-asset-gen still exposes the route but
+  asset-forge skips it.
+- See `docs/HARDWARE_REALITY.md` for the 6 GB VRAM compatibility
+  matrix.
 - **How we use it**: mcp_client → `asset_gen/text_to_3d` and
   `asset_gen/image_to_3d`
 
@@ -46,13 +50,20 @@ re-implemented by us using only public ideas (not their code).**
 
 ## TO INTEGRATE (open-source, permissive)
 
-### LL3M (Princeton/Threedle) — LLM agents writing Blender Python
-- Source: github.com/threedle/ll3m (524 stars, 2025-2026)
-- License: research-leaning; **need to verify before integration**
-- **Take**: the BlenderRAG knowledge base (Blender API doc retrieval).
-  Re-implement the corpus ourselves if license is restrictive.
-- **Risk**: medium. Worst case: re-build the RAG corpus from Blender's
-  public ScriptReference (which IS free to scrape).
+### LL3M (Princeton/Threedle) — DISCONTINUED
+- Source: github.com/threedle/ll3m (526 stars)
+- **STATUS: server discontinued 2026.** Their hosted server required
+  Claude Sonnet 3.7 which has been retired. Repo notice quote:
+  "we have discontinued the LL3M server."
+- **Decision**: we **DO NOT integrate LL3M.** Re-implement BlenderRAG
+  ourselves from public Blender ScriptReference (free, MIT-friendly,
+  no upstream dependency on a dead server).
+- **Alternative live patterns** (MIT, active 2026):
+  - **JustThreed** (Phanikondru/justthreed) — Blender + MCP + works
+    with Claude/Cursor/Ollama. MIT. Reference pattern.
+  - **saofund/LLM-Blender-Agent** — Blender + Function-Calling LLMs
+    (Claude/DeepSeek/Zhipu/Moonshot). MIT. Reference pattern.
+- **Risk**: zero, since we don't integrate the dead code at all.
 
 ### ProcFunc (Princeton) — function-oriented procedural Blender API
 - Source: github.com/princeton-vl/procfunc
@@ -61,12 +72,18 @@ re-implemented by us using only public ideas (not their code).**
   use directly. BSD-3 is permissive.
 - **Risk**: low.
 
-### AniGen (VAST-AI Research, SIGGRAPH 2026) — auto-rig + skin from image
+### AniGen (VAST-AI Research, SIGGRAPH 2026) — DEFERRED
 - Source: github.com/VAST-AI-Research/AniGen (299 stars)
-- License: MIT-ish (NOASSERTION but MIT-style permissive on inspection)
-- **Take**: the S^3 fields pipeline for character auto-rigging. Wrap
-  as a subprocess CLI to avoid linkage.
-- **Risk**: low-medium. Verify license text before shipping.
+- License: NOASSERTION (MIT-style permissive on inspection)
+- **STATUS: requires 12-16 GB VRAM.** Won't run on the operator's
+  6 GB GPU. **Deferred** until GPU upgrade (a used RTX 3060 12 GB
+  ~$200-300 makes this viable).
+- **Take when viable**: S^3 fields pipeline for character auto-
+  rigging. Subprocess CLI integration.
+- **For now**: character packs are deferred to Pack #4+ (after we
+  have first-pack revenue to upgrade GPU). Packs #1-#3 are
+  prop/environment-only.
+- **Risk**: zero, since we don't integrate it on this hardware.
 
 ### Instant Meshes — auto quad remesher
 - Source: github.com/wjakob/instant-meshes
