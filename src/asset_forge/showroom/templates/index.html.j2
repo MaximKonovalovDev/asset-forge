@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{{ brief.title }} — flax-game-studio</title>
+  <meta name="description" content="{{ brief.description }}" />
+  <meta property="og:title" content="{{ brief.title }}" />
+  <meta property="og:description" content="{{ brief.description }}" />
+  {% if cover_image %}<meta property="og:image" content="{{ cover_image }}" />{% endif %}
+  <link rel="stylesheet" href="assets/style.css" />
+</head>
+<body>
+  <header>
+    <h1>{{ brief.title }}</h1>
+    <p class="tagline">{{ brief.description }}</p>
+    {% if cover_image %}<img src="{{ cover_image }}" alt="{{ brief.title }} cover" class="cover" />{% endif %}
+  </header>
+
+  <section class="stats">
+    <div><span class="num">{{ brief.pieces|length }}</span><span class="lbl">pieces</span></div>
+    <div><span class="num">{{ categories|length }}</span><span class="lbl">categories</span></div>
+    <div><span class="num">{{ brief.exports|length }}</span><span class="lbl">engines</span></div>
+    <div><span class="num">${{ '%.2f'|format(brief.pricing.launch_usd) }}</span><span class="lbl">launch price</span></div>
+  </section>
+
+  <section class="marketplaces">
+    <h2>Buy it</h2>
+    <ul class="market-links">
+      {% for target, url in marketplace_links.items() %}
+        <li><a href="{{ url }}" class="market-link {{ target }}">{{ target|title }}</a></li>
+      {% endfor %}
+    </ul>
+  </section>
+
+  <section class="categories">
+    <h2>What's included</h2>
+    {% for category, pieces in pieces_by_category.items() %}
+    <div class="category">
+      <h3>{{ category|title }}</h3>
+      <div class="grid">
+        {% for piece in pieces %}
+        <a href="pieces/{{ piece.id }}.html" class="card">
+          {% if piece.hero_image %}<img src="{{ piece.hero_image }}" alt="{{ piece.id }}" />{% else %}<div class="card-placeholder"></div>{% endif %}
+          <div class="card-name">{{ piece.id|replace('_', ' ') }}</div>
+        </a>
+        {% endfor %}
+      </div>
+    </div>
+    {% endfor %}
+  </section>
+
+  <section class="style">
+    <h2>Style</h2>
+    <p>{{ brief.style.reference_description }}</p>
+    <div class="palette">
+      {% for color in brief.style.palette %}
+      <div class="swatch" style="background:{{ color }}" title="{{ color }}"></div>
+      {% endfor %}
+    </div>
+    <p class="tech">
+      Polygon range: {{ brief.style.polygon_count_band[0] }}–{{ brief.style.polygon_count_band[1] }} faces.
+      Texel density: {{ brief.style.texel_density_px_per_unit }} px/unit.
+      Shading: {{ brief.style.shading }}.
+    </p>
+  </section>
+
+  <section class="ai">
+    <h2>AI disclosure</h2>
+    <p>This pack was created with AI assistance using {{ brief.ai_disclosure.models_used|join(', ') }}. All pieces were reviewed by a human; topology, UVs, materials, and pivots were hand-validated. {% if brief.ai_disclosure.commercial_use_verified %}Commercial-use rights verified per upstream model.{% endif %}</p>
+  </section>
+
+  <footer>
+    <p>© 2026 flax-game-studio. <a href="https://github.com/flax-game-studio">github.com/flax-game-studio</a></p>
+  </footer>
+</body>
+</html>

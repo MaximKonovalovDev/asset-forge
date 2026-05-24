@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{{ piece.id }} — {{ brief.title }}</title>
+  <meta name="description" content="{{ piece.prompt }}" />
+  {% if piece.hero_image %}<meta property="og:image" content="../{{ piece.hero_image }}" />{% endif %}
+  <link rel="stylesheet" href="../assets/style.css" />
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.169.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.169.0/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+<body>
+  <header class="piece-header">
+    <p><a href="../index.html">← back to {{ brief.title }}</a></p>
+    <h1>{{ piece.id|replace('_', ' ') }}</h1>
+    <p class="tagline">{{ piece.prompt }}</p>
+    <p class="meta"><strong>Category:</strong> {{ piece.category }} · <strong>Canonical name:</strong> {{ canonical_name }}</p>
+  </header>
+
+  <section class="viewer">
+    <div id="viewer" data-glb="../{{ glb_relative_path }}"></div>
+    <p class="viewer-help">Drag to rotate · scroll to zoom · right-click to pan</p>
+  </section>
+
+  {% if thumbnail_images %}
+  <section class="thumbnails">
+    <h2>Angles</h2>
+    <div class="thumb-grid">
+      {% for thumb in thumbnail_images %}
+      <img src="../{{ thumb }}" alt="{{ piece.id }} angle" />
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
+  <section class="back-to-pack">
+    <a href="../index.html" class="cta">← back to {{ brief.title }}</a>
+  </section>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+    const container = document.getElementById('viewer');
+    const glbUrl = container.dataset.glb;
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x1a1a1f);
+
+    const camera = new THREE.PerspectiveCamera(45, container.clientWidth / 400, 0.1, 1000);
+    camera.position.set(3, 2, 3);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(container.clientWidth, 400);
+    renderer.setPixelRatio(window.devicePixelRatio);
+    container.appendChild(renderer.domElement);
+
+    const ambient = new THREE.AmbientLight(0xffffff, 0.6);
+    scene.add(ambient);
+    const key = new THREE.DirectionalLight(0xffffff, 1.0);
+    key.position.set(5, 8, 5);
+    scene.add(key);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.08;
+
+    new GLTFLoader().load(glbUrl, (gltf) => {
+      scene.add(gltf.scene);
+      // Frame the model
+      const box = new THREE.Box3().setFromObject(gltf.scene);
+      const size = box.getSize(new THREE.Vector3());
+      const center = box.getCenter(new THREE.Vector3());
+      gltf.scene.position.sub(center);
+      const maxDim = Math.max(size.x, size.y, size.z);
+      camera.position.set(maxDim * 1.5, maxDim * 1.2, maxDim * 1.5);
+      controls.target.set(0, 0, 0);
+      controls.update();
+    });
+
+    function animate() {
+      requestAnimationFrame(animate);
+      controls.update();
+      renderer.render(scene, camera);
+    }
+    animate();
+
+    window.addEventListener('resize', () => {
+      camera.aspect = container.clientWidth / 400;
+      camera.updateProjectionMatrix();
+      renderer.setSize(container.clientWidth, 400);
+    });
+  </script>
+</body>
+</html>

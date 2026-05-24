@@ -26,11 +26,14 @@ from asset_forge.common.types import (
 from asset_forge.export import EngineTarget, export_pack
 from asset_forge.lod import lod_pack
 from asset_forge.manifest import Target, build_manifests
+from asset_forge.materials import assign_pack_materials
 from asset_forge.mcp_client.backends import BackendRegistry, generate_with_fallback
 from asset_forge.mcp_client.session import McpSession
 from asset_forge.previews import preview_pack
 from asset_forge.retopo import retopo_pack
+from asset_forge.showroom import build_site
 from asset_forge.snap_grid import normalize_pack
+from asset_forge.style import review_pack_style
 from asset_forge.uvunwrap import unwrap_pack
 
 from .brief import load_brief
@@ -653,18 +656,175 @@ async def _phase_export(
     return f"{len(result.packages)}/{len(requested)} engine bundles built"
 
 
+async def _phase_style_review(
+    brief: Brief,
+    paths: PackPaths,
+    registry: BackendRegistry,
+    state: PackState,
+) -> str:
+    """Score piece hero images against pack reference; report outliers.
+
+    v1 reports only \u2014 doesn't re-queue outliers through generation. The
+    regen loop lands in a future iteration; for now operators see the
+    outlier list and can re-prompt manually.
+    """
+    del registry  # pure-IO + local image work
+
+    upstream = state.phases.get(Phase.PREVIEWS)
+    succeeded = list(upstream.pieces_completed) if upstream else []
+    if not succeeded:
+        return "skipped (no previews)"
+
+    result = await review_pack_style(
+        paths, brief, pieces_succeeded=succeeded
+    )
+
+    if not result.success:
+        _write_receipt(
+            paths.receipts_file,
+            pack_id=brief.id,
+            phase=Phase.STYLE_REVIEW,
+            tool="style/review",
+            intent="review pack style consistency",
+            outcome=Outcome.FAILED,
+            error_code=result.error_code,
+            error_message=result.error_message,
+        )
+        # Style review failure does NOT fail the pipeline; it's diagnostic.
+        return f"failed: {result.error_code} (non-fatal)"
+
+    _write_receipt(
+        paths.receipts_file,
+        pack_id=brief.id,
+        phase=Phase.STYLE_REVIEW,
+        tool="style/review",
+        intent="review pack style consistency",
+        outcome=Outcome.SUCCESS,
+        metadata={
+            "backend": result.backend,
+            "mean_score": result.mean_score,
+            "threshold": result.threshold,
+            "outliers": list(result.outliers),
+            "scored_count": len(result.scores),
+        },
+    )
+
+    ps = state.phase_state(Phase.STYLE_REVIEW)
+    ps.pieces_completed = [s.piece_id for s in result.scores if not s.is_outlier]
+    ps.pieces_failed = list(result.outliers)  # outliers logged but pipeline continues
+
+    return (
+        f"reviewed {len(result.scores)} pieces, "
+        f"{len(result.outliers)} outliers below {result.threshold:.2f} "
+        f"(mean {result.mean_score:.3f}, backend={result.backend})"
+    )
+
+
+async def _phase_materials(
+    brief: Brief,
+    paths: PackPaths,
+    registry: BackendRegistry,
+    state: PackState,
+) -> str:
+    """Assign palette-constrained materials to every UV-unwrapped piece."""
+    upstream = (
+        state.phases.get(Phase.UVUNWRAP)
+        or state.phases.get(Phase.RETOPO)
+        or state.phases.get(Phase.GENERATION)
+    )
+    succeeded = list(upstream.pieces_completed) if upstream else []
+    if not succeeded:
+        return "skipped (no upstream outputs)"
+
+    results = await assign_pack_materials(
+        paths, brief, pieces_succeeded=succeeded, session=registry.session
+    )
+    ok = [pid for pid, r in results.items() if r.success]
+    bad = [pid for pid, r in results.items() if not r.success]
+    ps = state.phase_state(Phase.MATERIALS)
+    ps.pieces_completed = ok
+    ps.pieces_failed = bad
+
+    for pid, r in results.items():
+        choice = r.choice
+        _write_receipt(
+            paths.receipts_file,
+            pack_id=brief.id,
+            phase=Phase.MATERIALS,
+            piece_id=pid,
+            tool="materials/assign",
+            intent=f"assign material to {pid}",
+            outcome=Outcome.SUCCESS if r.success else Outcome.FAILED,
+            error_code=r.error_code,
+            error_message=r.error_message,
+            metadata={
+                "duration_s": r.duration_seconds,
+                "material_id": choice.material_id if choice else None,
+                "material_name": choice.material_name if choice else None,
+                "score": choice.score if choice else None,
+                "reason": choice.reason if choice else None,
+            },
+        )
+
+    if not ok:
+        raise PhaseFailed(Phase.MATERIALS.value, f"all {len(results)} pieces failed materials")
+    return f"{len(ok)}/{len(results)} materials assigned"
+
+
+async def _phase_showroom(
+    brief: Brief,
+    paths: PackPaths,
+    registry: BackendRegistry,
+    state: PackState,
+) -> str:
+    """Build the static-site showroom for the pack."""
+    del registry  # showroom is pure-IO
+
+    upstream = (
+        state.phases.get(Phase.PREVIEWS)
+        or state.phases.get(Phase.LOD)
+        or state.phases.get(Phase.SNAP_GRID)
+    )
+    succeeded = list(upstream.pieces_completed) if upstream else []
+    if not succeeded:
+        return "skipped (no upstream outputs)"
+
+    result = await build_site(paths, brief, pieces_succeeded=succeeded)
+
+    _write_receipt(
+        paths.receipts_file,
+        pack_id=brief.id,
+        phase=Phase.SHOWROOM,
+        tool="showroom/build_site",
+        intent="build static showroom",
+        outcome=Outcome.SUCCESS if result.success else Outcome.FAILED,
+        error_code=result.error_code,
+        error_message=result.error_message,
+        metadata={
+            "site_root": str(result.site_root) if result.site_root else None,
+            "pages_generated": result.pages_generated,
+            "assets_total_mb": result.assets_total_mb,
+            "duration_s": result.duration_seconds,
+        },
+    )
+
+    if not result.success:
+        raise PhaseFailed(Phase.SHOWROOM.value, result.error_message or "showroom failed")
+    return f"site built: {result.pages_generated} pages, {result.assets_total_mb} MB"
+
+
 _PHASE_HANDLERS: dict[Phase, PhaseHandler] = {
     Phase.GENERATION: _phase_generation,
     Phase.RETOPO: _phase_retopo,
     Phase.UVUNWRAP: _phase_uvunwrap,
-    Phase.MATERIALS: _stub_for("materials"),
-    Phase.STYLE_REVIEW: _stub_for("style_review"),
+    Phase.MATERIALS: _phase_materials,
+    Phase.STYLE_REVIEW: _phase_style_review,
     Phase.LOD: _phase_lod,
     Phase.SNAP_GRID: _phase_snap_grid,
     Phase.EXPORT: _phase_export,
     Phase.PREVIEWS: _phase_previews,
     Phase.MANIFEST: _phase_manifest,
-    Phase.SHOWROOM: _stub_for("showroom"),
+    Phase.SHOWROOM: _phase_showroom,
 }
 
 
