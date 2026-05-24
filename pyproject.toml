@@ -58,7 +58,17 @@ target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "UP", "B", "SIM", "RUF", "ASYNC"]
-ignore = ["E501"]
+ignore = [
+    "E501",
+    # ASYNC240: pathlib.Path operations in async functions. Our filesystem ops
+    # are short and non-blocking in practice; we do not pull in trio/anyio.Path
+    # just to satisfy a stricter async hygiene rule.
+    "ASYNC240",
+    # B008: typer requires typer.Argument/Option in argument defaults. The
+    # whole CLI library design depends on it; the rule's "module-level singleton"
+    # workaround makes typer code unreadable.
+    "B008",
+]
 
 [tool.mypy]
 python_version = "3.12"
