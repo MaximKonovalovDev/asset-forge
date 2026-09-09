@@ -29,7 +29,7 @@ into a sellable asset-pack factory.
 - Does **not** modify `C:\flax\flax-mcp\` — flax-mcp is unchanged
 - Talks to flax-mcp as an **MCP client over :8765** (same way
   Claude Code does)
-- Has its own MIT license, its own CI, its own release cadence
+- Has its own proprietary license (see LICENSE), its own CI, its own release cadence
 - Can be open-sourced later without dragging flax-mcp along
 - Sold as a commercial product without exposing flax-mcp internals
 
