@@ -3,6 +3,18 @@
 **AI-driven game asset pack creation pipeline.** You direct, AI produces.
 Output: production-ready, marketplace-sellable, multi-engine asset packs.
 
+> Origin: built inside `flax-game-studio` (admin mirror under my name).
+> License: proprietary, flax-game-studio — see LICENSE. Not open source.
+
+## Quick start
+
+```powershell
+pip install -e .
+asset-forge --help
+```
+
+Pipeline: orchestrator → materials → retopo → LOD → previews → manifest → export → showroom. Talks to flax-mcp as an MCP client (same way Claude Code does); flax-mcp itself stays unchanged.
+
 Born from: flax-mcp's existing 70-tool asset-pipeline surface
 (flax-asset-gen + flax-asset-worker + flax-blender-bridge +
 flax-meshopt-bridge + flax-procedural). asset-forge is the
@@ -13,7 +25,7 @@ into a sellable asset-pack factory.
 
 **asset-forge is a STANDALONE repo, not a flax-mcp plugin.**
 
-- Lives at `C:\Users\me\Desktop\asset-forge\` (this directory)
+- Lives in this repo (standalone checkout, any path)
 - Does **not** modify `C:\flax\flax-mcp\` — flax-mcp is unchanged
 - Talks to flax-mcp as an **MCP client over :8765** (same way
   Claude Code does)
